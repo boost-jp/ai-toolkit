@@ -40,26 +40,64 @@ Figma デザインから UI コンポーネントの要件定義を行い、実�
 
 4. **Figma MCP ツールでデザイン情報を取得**（新規コンポーネントのみ）
 
-```typescript
-// 以下のツールを並列で呼び出す
-mcp__figma-desktop__get_screenshot({
-  nodeId: "抽出したnode-id",
-  clientLanguages: "typescript",
-  clientFrameworks: "react"
-})
+   #### Step 1: スクリーンショットとメタデータを取得
 
-mcp__figma-desktop__get_design_context({
-  nodeId: "抽出したnode-id",
-  clientLanguages: "typescript",
-  clientFrameworks: "react"
-})
+   ```typescript
+   // 並列で呼び出す
+   mcp__figma-desktop__get_screenshot({
+     nodeId: "抽出したnode-id",
+     clientLanguages: "typescript",
+     clientFrameworks: "react"
+   })
 
-mcp__figma-desktop__get_variable_defs({
-  nodeId: "抽出したnode-id",
-  clientLanguages: "typescript",
-  clientFrameworks: "react"
-})
-```
+   mcp__figma-desktop__get_metadata({
+     nodeId: "抽出したnode-id",
+     clientLanguages: "typescript",
+     clientFrameworks: "react"
+   })
+
+   mcp__figma-desktop__get_variable_defs({
+     nodeId: "抽出したnode-id",
+     clientLanguages: "typescript",
+     clientFrameworks: "react"
+   })
+   ```
+
+   #### Step 2: デザインコンテキストを段階的に取得
+
+   `get_design_context` はレスポンスの Token 量が大きくなりやすいため、**段階的に分割取得**する。
+
+   1. **まずルートノードの構造を取得**
+      ```typescript
+      mcp__figma-desktop__get_design_context({
+        nodeId: "ルートのnode-id",
+        clientLanguages: "typescript",
+        clientFrameworks: "react"
+      })
+      ```
+
+   2. **Token Limit エラーが発生した場合、子ノード単位で分割取得**
+      - Step 1 で取得した `get_metadata` の結果から子ノードの node-id を特定
+      - 各子ノードに対して個別に `get_design_context` を呼び出す
+      ```typescript
+      // 子ノードごとに並列で呼び出す
+      mcp__figma-desktop__get_design_context({
+        nodeId: "子ノード1のnode-id",
+        clientLanguages: "typescript",
+        clientFrameworks: "react"
+      })
+      mcp__figma-desktop__get_design_context({
+        nodeId: "子ノード2のnode-id",
+        clientLanguages: "typescript",
+        clientFrameworks: "react"
+      })
+      // ...
+      ```
+
+   3. **それでも Token Limit エラーが発生する場合、さらに深い階層で分割**
+      - エラーが出たノードの子ノードを特定し、再帰的に分割取得を繰り返す
+
+   > **注意**: 取得した各パーツのデザイン情報を統合して、全体のコンポーネント構造を把握すること。
 
 ### Phase 4: 実装方針の提案
 
